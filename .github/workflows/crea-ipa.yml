@@ -1,0 +1,60 @@
+
+name: 'DVS Music 0.5 - iPhone audio nativo (sperimentale)'
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout codice
+        uses: actions/checkout@v4
+
+      - name: Installa XcodeGen
+        run: brew install xcodegen
+
+      - name: Genera progetto nativo iOS
+        working-directory: native-ios
+        run: xcodegen generate
+
+      - name: Compila app iPhone senza firma
+        working-directory: native-ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -resolvePackageDependencies -project DVSMusicNative.xcodeproj -scheme DVSMusicNative
+          xcodebuild \
+            -project DVSMusicNative.xcodeproj \
+            -scheme DVSMusicNative \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$PWD/ios-build" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY='' \
+            build
+
+      - name: Crea file IPA non firmato
+        working-directory: native-ios
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP=$(find ios-build/Build/Products/Release-iphoneos -maxdepth 1 -type d -name '*.app' -print -quit)
+          test -n "$APP"
+          mkdir -p package/Payload
+          ditto "$APP" "package/Payload/$(basename "$APP")"
+          (cd package && zip -qry ../DVS_Music_v05_unsigned.ipa Payload)
+
+      - name: Scarica IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: DVS_Music_05_iPhone_IPA_non_firmato
+          path: native-ios/DVS_Music_v05_unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error
