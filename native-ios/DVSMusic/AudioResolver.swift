@@ -19,7 +19,6 @@ struct AudioResolver {
             .highestAudioBitrateStream() else {
             throw ResolveError.noAudio
         }
-        try await stream.waitUntilAvailable()
         return AVPlayerItem(url: stream.url)
     }
 }
